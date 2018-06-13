@@ -1,0 +1,112 @@
+Introduction
+============
+
+This file is aiming at reproducing results of a exponential moving average example in the below link using Python 3.6 Pandas library.
+
+https://admiralmarkets.com/education/articles/forex-indicators/exponential-moving-average
+
+The formula to calculate the weighted moving average is as blow:
+
+
+	EMA (t) = α x current price + (1- α) x EMA(t-1)
+
+Since it is a recursive formula, we have to have n-previous values of EMA(t) to be able to calculate the results. The n parameter is also called the "span" parameter which defines the smoothing constant α as describe below:
+
+	α = 2 / (n + 1)
+
+The higher the value of n, the more previous samples contribute to the average calculations, the less the current price value is wieghted in calculating the exponential moving average. 
+
+One problem for such calculation is that for first few samples (where the index of the data point is smaller than n), there is not enough sample points to calculate the calculate the recursive EMA formal. Therefore, we have to come up with an estimate for EMA( t = 1 ). There are two main approches to to tackle this issue.
+
+First method is to use the price value of the first data point as its EMA. In other words, the assumption is EMA ( t = 1 ) = Price (t = 1).
+
+
+The second method to estimate this value is to ignore the first n data samples, and then estmate EMA( t = n + 1 ) to be average for the first n samples.
+
+
+
+
+How Pandas estimates the initial value for EMA(t = 1)
+=====================================================
+
+Pandas uses the first method to estimate the EMA(t = 1), where the EMA value of the first data point is considered to be the same its value EMA ( t = 1 ) = Price (t = 1).
+
+
+
+
+Admiralmarkets example
+======================
+
+This example contains 17 data points as inllustrated under "Sample Price" column in the below table. The EMA values are under 8_day_EMA column where n = 8 and α = 0.22 = (2 / 1 + 8). Values under 8_day_SMA represent Simple Moving Average.
+
+
+    Day   sample_price   8_day_SMA         α   8_day_EMA 
+---------------------------------------------------------
+0      1            168         NaN       NaN         NaN
+1      2            170         NaN       NaN         NaN
+2      3            171         NaN       NaN         NaN
+3      4            175         NaN       NaN         NaN
+4      5            170         NaN       NaN         NaN
+5      6            172         NaN       NaN         NaN
+6      7            176         NaN       NaN         NaN
+7      8            179         NaN       NaN         NaN
+8      9            178     172.625  0.222222    172.6250
+9     10            186     173.875  0.222222    175.5972
+10    11            192     175.875  0.222222    179.2423
+11    12            183     178.500  0.222222    180.0773
+12    13            177     179.500  0.222222    179.3935
+13    14            172     180.375  0.222222    177.7505
+14    15            167     180.375  0.222222    175.3615
+15    16            177     179.250  0.222222    175.7256
+16    17            180     179.000  0.222222    176.6755
+
+
+This eamples uses the second method to initialize the EMA value for EMA( t = n + 1) where average of the first n samples is used to estimate EMA(t = n + 1). Having this value, the example uses the recursive formula of EMA to calculate the moving exponenetial moving average for the rest of the data points.
+
+
+
+How to reporduce the results in Panas
+=====================================
+
+To achieve the same results as above using Pandas, we first change the value of the 9th ((n+1)-th) data point to the average of the previous n data points which is 172.6250: 
+
+	# set the value for 9th (n + 1) data point to the average of the frist 8 datapoints.
+	arg.iat[8,5] = 	172.625
+
+and only then use the Pandas.ema to calculte the EMA from the (n+1)-th data point:
+	
+	# ignore first n = 8 exampls
+	arg = arg.iloc[8:,:]		
+
+	# call the Panda EMA
+	arg['EWMA'] = arg.iloc[:,5].ewm(com=None, span=8, halflife=None, 
+		min_periods=0, 
+		adjust=False, 
+		ignore_na=False).mean()
+	
+
+Which produces the exact same results presented in the Admiralmarkets.com example.
+
+
+    Day   sample_price   8_day_SMA         α   8_day_EMA     8_day_EMA_w/_Pandas
+--------------------------------------------------------------------------------
+0      1            168         NaN       NaN         NaN                    NaN
+1      2            170         NaN       NaN         NaN                    NaN
+2      3            171         NaN       NaN         NaN                    NaN
+3      4            175         NaN       NaN         NaN                    NaN
+4      5            170         NaN       NaN         NaN                    NaN
+5      6            172         NaN       NaN         NaN                    NaN
+6      7            176         NaN       NaN         NaN                    NaN
+7      8            179         NaN       NaN         NaN                    NaN
+8      9  (old 178) 172.6   172.625  0.222222    172.6250             172.625000
+9     10            186     173.875  0.222222    175.5972             175.597222
+10    11            192     175.875  0.222222    179.2423             179.242284
+11    12            183     178.500  0.222222    180.0773             180.077332
+12    13            177     179.500  0.222222    179.3935             179.393480
+13    14            172     180.375  0.222222    177.7505             177.750485
+14    15            167     180.375  0.222222    175.3615             175.361488
+15    16            177     179.250  0.222222    175.7256             175.725602
+16    17            180     179.000  0.222222    176.6755             176.675468
+
+
+
